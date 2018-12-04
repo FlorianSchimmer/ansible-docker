@@ -59,8 +59,10 @@
     - '/etc/systemd/system/docker.service'
     - '/lib/systemd/system/docker.service'
     - '/etc/default/docker'
-    - '/etc/docker/daemon.json'
+    # - '/etc/docker/daemon.json'
     - '/etc/systemd/system/docker.service.d/http-proxy.conf'
+    # - '/etc/systemd/system/docker.service.d/service.conf'
+    - '/etc/systemd/system/docker.service.d/socket.conf'
   when: (docker__register_other_version_removed|changed)
 
 - name: Install required packages
@@ -139,25 +141,37 @@
   tags: [ 'role::docker:config' ]
   when: (ansible_service_mgr != 'systemd' or docker__register_version.stdout | version_compare('1.10', '<'))
 
-- name: Configure Docker systemd options
-  template:
-    src: 'etc/docker/daemon.json.j2'
-    dest: '/etc/docker/daemon.json'
-    owner: 'root'
-    group: 'root'
-    mode: '0644'
-  notify: [ 'Restart docker' ]
-  tags: [ 'role::docker:config' ]
-  when: (ansible_service_mgr == 'systemd' and docker__register_version.stdout | version_compare('1.10', '>='))
+# - name: Configure Docker systemd options
+#   template:
+#     src: 'etc/docker/daemon.json.j2'
+#     dest: '/etc/docker/daemon.json'
+#     owner: 'root'
+#     group: 'root'
+#     mode: '0644'
+#   notify: [ 'Restart docker' ]
+#   tags: [ 'role::docker:config' ]
+#   when: (ansible_service_mgr == 'systemd' and docker__register_version.stdout | version_compare('1.10', '>='))
 
-- name: Install Debian systemd service unit
+# - name: Install Debian systemd service unit
+#   template:
+#     src: 'etc/systemd/system/docker.service.d/service.conf.j2'
+#     dest: '/etc/systemd/system/docker.service.d/service.conf'
+#     owner: 'root'
+#     group: 'root'
+#     mode: '0644'
+#   register: docker__register_systemd_service
+#   notify: ['Restart docker' ]
+#   when: ansible_service_mgr == 'systemd'
+#   tags: [ 'role::docker:config' ]
+
+- name: Install Debian systemd socket unit
   template:
-    src: 'etc/systemd/system/docker.service.j2'
-    dest: '/etc/systemd/system/docker.service'
+    src: 'etc/systemd/system/docker.service.d/socket.conf.j2'
+    dest: '/etc/systemd/system/docker.service.d/socket.conf'
     owner: 'root'
     group: 'root'
     mode: '0644'
-  register: docker__register_systemd_service
+  register: docker__register_systemd_socket
   notify: ['Restart docker' ]
   when: ansible_service_mgr == 'systemd'
   tags: [ 'role::docker:config' ]
@@ -180,7 +194,9 @@
   notify: [ 'Restart docker']
   when: (ansible_service_mgr == 'systemd' and
          ((docker__register_systemd_service|d() and
-         docker__register_systemd_service|changed) or
+         docker__register_systemd_service|changed) or 
+         (docker__register_systemd_socket|d() and
+         docker__register_systemd_socket|changed) or
          (docker__register_systemd_proxy_present|d() and
          docker__register_systemd_proxy_present|changed) or
          (docker__register_systemd_proxy_absent|d() and
